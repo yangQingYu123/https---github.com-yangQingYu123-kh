@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>员工管理 - 部门统计</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; background: #f4f6fa; color: #333; }
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: 210px; background: #2c3e50; color: #fff; flex-shrink: 0; position: relative; }
+  .sidebar .logo { padding: 22px 20px; font-size: 18px; font-weight: 600; border-bottom: 1px solid #3d5166; }
+  .sidebar nav { padding: 12px 0; }
+  .sidebar nav a { display: block; padding: 13px 22px; color: #cdd6e0; text-decoration: none; font-size: 14px; border-left: 3px solid transparent; transition: all .15s; }
+  .sidebar nav a:hover { background: #34495e; color: #fff; }
+  .sidebar nav a.active { background: #34495e; color: #fff; border-left-color: #667eea; }
+  .sidebar .foot { position: absolute; bottom: 0; width: 210px; padding: 16px 20px; border-top: 1px solid #3d5166; }
+  .sidebar .foot .who { font-size: 13px; color: #cdd6e0; margin-bottom: 8px; }
+  .sidebar .foot button { background: none; border: 1px solid #5a6d80; color: #cdd6e0; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+  .sidebar .foot button:hover { background: #34495e; }
+  .main { flex: 1; display: flex; flex-direction: column; }
+  .topbar { background: #fff; padding: 16px 26px; border-bottom: 1px solid #eaecf0; font-size: 16px; font-weight: 600; }
+  .content { padding: 22px 26px; }
+  .cards { display: flex; gap: 18px; margin-bottom: 24px; flex-wrap: wrap; }
+  .card { background: #fff; border-radius: 8px; padding: 20px 24px; flex: 1; min-width: 180px; box-shadow: 0 1px 4px rgba(0,0,0,.05); }
+  .card .label { font-size: 13px; color: #888; margin-bottom: 8px; }
+  .card .value { font-size: 30px; font-weight: 700; color: #2c3e50; }
+  .card .value.blue { color: #667eea; }
+  .card .value.green { color: #27ae60; }
+  .panel { background: #fff; border-radius: 8px; padding: 22px 26px; box-shadow: 0 1px 4px rgba(0,0,0,.05); margin-bottom: 22px; }
+  .panel h3 { font-size: 15px; margin-bottom: 18px; color: #444; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { background: #f8fafc; padding: 12px 14px; text-align: left; font-size: 13px; color: #666; border-bottom: 1px solid #eaecf0; }
+  tbody td { padding: 12px 14px; font-size: 14px; border-bottom: 1px solid #f2f4f7; }
+  .chart { display: flex; align-items: flex-end; gap: 28px; height: 260px; padding: 10px 10px 0; }
+  .bar-group { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
+  .bar-wrap { flex: 1; display: flex; align-items: flex-end; width: 100%; justify-content: center; }
+  .bar { width: 56px; background: linear-gradient(180deg, #667eea 0%, #5568d3 100%); border-radius: 6px 6px 0 0; position: relative; transition: height .6s ease; min-height: 6px; }
+  .bar .val { position: absolute; top: -22px; left: 50%; transform: translateX(-50%); font-size: 13px; color: #555; white-space: nowrap; }
+  .bar-group .name { margin-top: 10px; font-size: 13px; color: #666; }
+  .empty { text-align: center; padding: 30px; color: #999; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="logo">员工管理系统</div>
+    <nav>
+      <a href="index.html" id="nav-list">📋 员工列表</a>
+      <a href="stats.html" class="active" id="nav-stats">📊 部门统计</a>
+    </nav>
+    <div class="foot">
+      <div class="who" id="who"></div>
+      <button onclick="logout()">退出登录</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">部门统计</div>
+    <div class="content">
+      <div class="cards">
+        <div class="card">
+          <div class="label">部门总数</div>
+          <div class="value blue" id="kpi_depts">-</div>
+        </div>
+        <div class="card">
+          <div class="label">员工总数</div>
+          <div class="value" id="kpi_total">-</div>
+        </div>
+        <div class="card">
+          <div class="label">在职人数</div>
+          <div class="value green" id="kpi_active">-</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>各部门人数分布</h3>
+        <div class="chart" id="chart"></div>
+        <div class="empty" id="chartEmpty" style="display:none">暂无数据</div>
+      </div>
+
+      <div class="panel">
+        <h3>部门明细</h3>
+        <table>
+          <thead>
+            <tr><th>部门</th><th>人数</th><th>平均入职时长（天）</th></tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        <div class="empty" id="tableEmpty" style="display:none">暂无数据</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/common.js"></script>
+<script>
+  guard();
+  document.getElementById('who').textContent = '当前账号：' + (getUser() || 'admin');
+
+  async function loadStats() {
+    try {
+      const res = await request('/api/stats/departments');
+      const list = res.data || [];
+      renderTable(list);
+      renderChart(list);
+      updateKpi(list);
+    } catch (e) {
+      toast(e.message, 'err');
+    }
+  }
+
+  function renderTable(list) {
+    const tb = document.getElementById('tbody');
+    const empty = document.getElementById('tableEmpty');
+    if (!list.length) { tb.innerHTML = ''; empty.style.display = 'block'; return; }
+    empty.style.display = 'none';
+    tb.innerHTML = list.map(it => `<tr>
+      <td>${escapeHtml(it.department)}</td>
+      <td>${it.count}</td>
+      <td>${it.avg_days}</td>
+    </tr>`).join('');
+  }
+
+  function renderChart(list) {
+    const box = document.getElementById('chart');
+    const empty = document.getElementById('chartEmpty');
+    if (!list.length) { box.innerHTML = ''; empty.style.display = 'block'; return; }
+    empty.style.display = 'none';
+    const max = Math.max(...list.map(i => i.count));
+    box.innerHTML = list.map(it => {
+      const h = Math.max(6, Math.round((it.count / max) * 100));
+      return `<div class="bar-group">
+        <div class="bar-wrap"><div class="bar" style="height:0" data-h="${h}"><span class="val">${it.count} 人</span></div></div>
+        <div class="name">${escapeHtml(it.department)}</div>
+      </div>`;
+    }).join('');
+    // 动画展开
+    requestAnimationFrame(() => {
+      box.querySelectorAll('.bar').forEach(b => { b.style.height = b.dataset.h + '%'; });
+    });
+  }
+
+  async function updateKpi(list) {
+    document.getElementById('kpi_depts').textContent = list.length;
+    const total = list.reduce((s, i) => s + i.count, 0);
+    document.getElementById('kpi_total').textContent = total;
+    // 在职人数需查列表汇总（统计接口只按部门分组，此处直接调列表接口）
+    try {
+      const r = await request('/api/employees?page=1&page_size=1');
+      document.getElementById('kpi_active').textContent = r.data.total;
+    } catch (e) { /* 忽略 */ }
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function toast(msg, type) {
+    let t = document.getElementById('toast');
+    if (!t) { t = document.createElement('div'); t.className = 'toast'; document.body.appendChild(t); }
+    t.textContent = msg; t.className = 'toast show ' + (type || '');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  loadStats();
+</script>
+</body>
+</html>

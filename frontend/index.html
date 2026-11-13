@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>员工管理 - 员工列表</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; background: #f4f6fa; color: #333; }
+  .layout { display: flex; min-height: 100vh; }
+  /* 侧边栏 */
+  .sidebar { width: 210px; background: #2c3e50; color: #fff; flex-shrink: 0; }
+  .sidebar .logo { padding: 22px 20px; font-size: 18px; font-weight: 600; border-bottom: 1px solid #3d5166; }
+  .sidebar nav { padding: 12px 0; }
+  .sidebar nav a {
+    display: block; padding: 13px 22px; color: #cdd6e0; text-decoration: none; font-size: 14px;
+    border-left: 3px solid transparent; transition: all .15s;
+  }
+  .sidebar nav a:hover { background: #34495e; color: #fff; }
+  .sidebar nav a.active { background: #34495e; color: #fff; border-left-color: #667eea; }
+  .sidebar .foot { position: absolute; bottom: 0; width: 210px; padding: 16px 20px; border-top: 1px solid #3d5166; }
+  .sidebar .foot .who { font-size: 13px; color: #cdd6e0; margin-bottom: 8px; }
+  .sidebar .foot button { background: none; border: 1px solid #5a6d80; color: #cdd6e0; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+  .sidebar .foot button:hover { background: #34495e; }
+  .sidebar { position: relative; }
+  /* 主区 */
+  .main { flex: 1; display: flex; flex-direction: column; }
+  .topbar { background: #fff; padding: 16px 26px; border-bottom: 1px solid #eaecf0; font-size: 16px; font-weight: 600; }
+  .content { padding: 22px 26px; }
+  .toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
+  .toolbar input[type=text], .toolbar select {
+    padding: 9px 12px; border: 1px solid #dcdfe6; border-radius: 6px; font-size: 14px; outline: none;
+  }
+  .toolbar input[type=text]:focus, .toolbar select:focus { border-color: #667eea; }
+  .toolbar input.search { width: 200px; }
+  .btn {
+    padding: 9px 16px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; transition: background .15s;
+  }
+  .btn-primary { background: #667eea; color: #fff; }
+  .btn-primary:hover { background: #5568d3; }
+  .btn-success { background: #2ecc71; color: #fff; }
+  .btn-success:hover { background: #27ae60; }
+  .btn-edit { background: #3498db; color: #fff; }
+  .btn-edit:hover { background: #2980b9; }
+  .btn-del { background: #e74c3c; color: #fff; }
+  .btn-del:hover { background: #c0392b; }
+  .btn-sm { padding: 5px 12px; font-size: 13px; border-radius: 4px; border: none; cursor: pointer; }
+  /* 表格 */
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.05); }
+  thead th { background: #f8fafc; padding: 13px 14px; text-align: left; font-size: 13px; color: #666; border-bottom: 1px solid #eaecf0; white-space: nowrap; }
+  tbody td { padding: 13px 14px; font-size: 14px; border-bottom: 1px solid #f2f4f7; }
+  tbody tr:hover { background: #fafbfe; }
+  .status { padding: 3px 9px; border-radius: 12px; font-size: 12px; }
+  .status.on { background: #e7f7ee; color: #27ae60; }
+  .status.off { background: #fdecea; color: #e74c3c; }
+  .empty { text-align: center; padding: 40px; color: #999; }
+  /* 分页 */
+  .pagination { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 20px; }
+  .pagination button { padding: 7px 13px; border: 1px solid #dcdfe6; background: #fff; border-radius: 5px; cursor: pointer; font-size: 14px; }
+  .pagination button:hover:not(:disabled) { border-color: #667eea; color: #667eea; }
+  .pagination button:disabled { opacity: .4; cursor: not-allowed; }
+  .pagination .info { font-size: 13px; color: #888; margin: 0 10px; }
+  /* 弹窗 */
+  .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; z-index: 100; }
+  .modal-mask.show { display: flex; }
+  .modal { background: #fff; border-radius: 10px; width: 460px; padding: 26px 28px; box-shadow: 0 12px 40px rgba(0,0,0,.2); }
+  .modal h3 { font-size: 17px; margin-bottom: 20px; }
+  .modal .field { margin-bottom: 14px; }
+  .modal .field label { display: block; font-size: 13px; color: #555; margin-bottom: 5px; }
+  .modal .field label .req { color: #e74c3c; }
+  .modal .field input, .modal .field select {
+    width: 100%; padding: 9px 11px; border: 1px solid #dcdfe6; border-radius: 6px; font-size: 14px; outline: none;
+  }
+  .modal .field input:focus, .modal .field select:focus { border-color: #667eea; }
+  .modal .field .hint { font-size: 12px; color: #e74c3c; margin-top: 4px; display: none; }
+  .modal .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+  .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #323232; color: #fff; padding: 12px 22px; border-radius: 6px; font-size: 14px; z-index: 200; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  .toast.ok { background: #27ae60; }
+  .toast.err { background: #e74c3c; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="logo">员工管理系统</div>
+    <nav>
+      <a href="index.html" class="active" id="nav-list">📋 员工列表</a>
+      <a href="stats.html" id="nav-stats">📊 部门统计</a>
+    </nav>
+    <div class="foot">
+      <div class="who" id="who"></div>
+      <button onclick="logout()">退出登录</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">员工列表</div>
+    <div class="content">
+      <div class="toolbar">
+        <input type="text" class="search" id="kw" placeholder="按姓名 / 工号搜索">
+        <select id="deptFilter">
+          <option value="">全部部门</option>
+        </select>
+        <button class="btn btn-primary" onclick="loadList()">查询</button>
+        <button class="btn btn-success" onclick="openForm()">+ 新增员工</button>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>工号</th><th>姓名</th><th>部门</th><th>职位</th><th>手机号</th><th>入职日期</th><th>状态</th><th style="width:130px">操作</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="empty" id="empty" style="display:none">暂无数据</div>
+
+      <div class="pagination">
+        <button id="prevBtn" onclick="changePage(-1)">上一页</button>
+        <span class="info" id="pageInfo"></span>
+        <button id="nextBtn" onclick="changePage(1)">下一页</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 新增 / 编辑弹窗 -->
+<div class="modal-mask" id="formMask">
+  <div class="modal">
+    <h3 id="formTitle">新增员工</h3>
+    <input type="hidden" id="f_id">
+    <div class="field">
+      <label>工号 <span class="req">*</span></label>
+      <input type="text" id="f_emp_no" placeholder="如 EMP001">
+      <div class="hint" id="e_emp_no"></div>
+    </div>
+    <div class="field">
+      <label>姓名 <span class="req">*</span></label>
+      <input type="text" id="f_name" placeholder="请输入姓名">
+      <div class="hint" id="e_name"></div>
+    </div>
+    <div class="field">
+      <label>部门 <span class="req">*</span></label>
+      <input type="text" id="f_department" placeholder="如 技术部">
+      <div class="hint" id="e_department"></div>
+    </div>
+    <div class="field">
+      <label>职位</label>
+      <input type="text" id="f_position" placeholder="如 后端工程师">
+    </div>
+    <div class="field">
+      <label>手机号 <span class="req">*</span></label>
+      <input type="text" id="f_phone" placeholder="11 位手机号" maxlength="11">
+      <div class="hint" id="e_phone"></div>
+    </div>
+    <div class="field">
+      <label>入职日期 <span class="req">*</span></label>
+      <input type="date" id="f_hire_date">
+      <div class="hint" id="e_hire_date"></div>
+    </div>
+    <div class="field">
+      <label>状态</label>
+      <select id="f_status">
+        <option value="active">在职</option>
+        <option value="resigned">离职</option>
+      </select>
+    </div>
+    <div class="actions">
+      <button class="btn" style="background:#f2f4f7;color:#666" onclick="closeForm()">取消</button>
+      <button class="btn btn-primary" id="saveBtn" onclick="save()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/common.js"></script>
+<script src="js/list.js"></script>
+</body>
+</html>
